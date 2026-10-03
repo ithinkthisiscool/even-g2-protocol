@@ -1,138 +1,118 @@
-# g2-glasses-sdk
+# even-g2-protocol
 
-An advanced, community-built Python SDK that fully reverse-engineers the dual-lens communication protocols, peripheral pipelines, and native dashboard interface of the **Even Realities G2 Smart Glasses**.
+A third-party Python library and protocol mapping for Even Realities G2 smart glasses. This package provides direct access to the dual-lens BLE characteristics, native dashboard layout controls, raw LC3 microphone streams, and IMU telemetry.
 
-This library abstracts the underlying BLE transport layers into a clean, event-driven `GlassesSession` architecture, giving you complete control over the heads-up display (HUD), audio recording streams, IMU motion telemetry, and peripheral device pairing routines.
+## Features
 
----
-
-## ✨ Key Capabilities
-
-* **Dual-Lens Session Management**: Synchronizes connection orchestration (fast-path address via BlueZ or callback scanning) and automated background heartbeat (`SID 0xE0`) loops.
-* **Native Dashboard Customization**: Real-time canvas text adjustments, card layout upgrades, and multi-container viewport mapping through protobuf abstractions.
-* **High-Fidelity Audio Capture**: Asynchronous streaming queues extracting raw 205-byte LC3 microphone notifications (`0x6402`) direct from the right/left stems.
-* **Service Architecture Routing**: Built-in protocol router mapping incoming and outgoing data frames directly to their respective on-glasses subsystems.
+* **Session Management**: Automated connection handling for both lenses via BlueZ mac address fast-path or background scanning, including the required 4-second `SID 0xE0` heartbeat loop.
+* **Dashboard Modification**: Updates text fields and switches page configurations inside the native on-glasses UI.
+* **Audio Capture**: Asynchronous queues for extracting raw 205-byte LC3 microphone frames from the left and right stems.
+* **Subsystem Routing**: Built-in mapping that decodes and routes inbound data packets based on their one-byte Service ID (SID).
 
 ---
 
-## 🛠️ Protocol Architecture (Service IDs)
+## Service ID (SID) Map
 
-Every BLE frame sent to or from the glasses carries a one-byte **Service ID (SID)** in its header (byte 6). This acts exactly like a network port number, routing your payloads to specific systems or apps running on the lenses. 
+Every BLE frame to or from the glasses contains a one-byte Service ID (SID) at byte index 6 of the header. This byte routes the data packet to a specific subsystem on the glasses.
 
-This SDK natively maps and handles these core subsystems:
+### Core Applications
+* `0x01` (Dashboard): Direct modifications to the native HUD home dashboard.
+* `0x03` (Menu): Interaction with the app selection carousel.
+* `0x04` (Notification): Plaintext phone notifications and HUD popups.
+* `0x05` / `0x06` (Translate / Teleprompter): Dedicated text-streaming modes.
+* `0x07` (Even AI): Default assistant app connection routes.
+* `0x08` (Navigation): Map turn indicators and location vectors.
+* `0x0C` (Quicklist): Task checklists and tick tracking.
 
-### Core Applications & HUD Displays
-* **`0x01` (Dashboard)**: Interacts with the native HUD home dashboard display.
-* **`0x03` (Menu)**: Interacts with the main application item carousel.
-* **`0x04` (Notification)**: System notification forwarding and HUD popups.
-* **`0x05` / `0x06` (Translate / Teleprompter)**: Specialized real-time text streaming applications.
-* **`0x07` (Even AI)**: Voice assistant pipelines and active processing routes.
-* **`0x08` (Navigation)**: Turn-by-turn map displays and routing telemetry vectors.
-* **`0x0C` (Quicklist)**: Task checklists and item tick tracking.
-
-### System & Peripheral Controls
-* **`0x0D` (App Sync)**: Tracks and reports which app is currently open in the foreground.
-* **`0x80` (Device Config)**: Low-level BLE authentication, bonding, and initialization.
-* **`0x90` / `0x91` (Ring / Ring 2)**: Captured inputs from the R1 Ring smart controller channels.
-* **`0xC4` / `0xC5` (File Command / Data)**: Embedded File System (EFS) transfer pipelines.
-* **`0xE0` (EvenHub UI)**: Custom programmatic text/list UI layers and connection heartbeats.
+### System & Peripherals
+* `0x0D` (App Sync): Reports which application is currently open on the glasses.
+* `0x80` (Device Config): BLE authentication, initial bonding, and device setup.
+* `0x90` / `0x91` (Ring / Ring 2): Captures inputs and gestures from the R1 Ring companion controller.
+* `0xC4` / `0xC5` (File Command / Data): Low-level Embedded File System (EFS) read and write operations.
+* `0xE0` (EvenHub UI): Session keep-alives and custom structural container canvas pages.
 
 ---
 
-## 🚀 Quick Start & Code Examples
+## Code Examples
 
-### 1. Connection Lifecycle & HUD Text Pushes
-This snippet demonstrates establishing a session using environment variables (`G2_RIGHT_MAC` / `G2_LEFT_MAC`) or automatic hardware pair discovery, querying hardware details, and pushing text elements into the native HUD.
+### 1. Connection & HUD Text Injection
+Connects to the hardware using `G2_RIGHT_MAC` and `G2_LEFT_MAC` environment variables (or auto-discovery), runs the authentication handshake, and updates a native dashboard text container.
 
 ```python
 import asyncio
-from g2_sdk import open_session
+from g2_protocol import open_session
 
-async def update_hud_view():
-    # Launches connection sequence (auth, protocol prelude, and 4s background heartbeats)
-    # Keeping skip_page=True ensures the native operating dashboard remains active
+async def update_hud():
+    # skip_page=True leaves the native dashboard visible without drawing an app over it
     async with open_session(launch_app=True, skip_page=True) as session:
-        print(f"Verifying connections... Status: {session.is_connected}")
+        print(f"Connected: {session.is_connected}")
         
-        # Pull system status queries (battery levels, charging flags, firmware variants)
-        device_telemetry = await session.query_settings()
-        print(f"Hardware Status: {device_telemetry}")
+        # Query battery status and firmware metadata
+        settings = await session.query_settings()
+        print(f"Device Info: {settings}")
 
-        # Update text configurations in the viewport's primary dashboard module
-        print("Pushing updated context packet onto the heads-up display stack...")
-        await session.update_text("System Active: Jarvis Interface Engaged.")
-        
-        # Keep connection open briefly to verify receipt
+        # Push updated text to the main dashboard container
+        await session.update_text("System Ready.")
         await asyncio.sleep(5)
 
 if __name__ == "__main__":
-    asyncio.run(update_hud_view())
+    asyncio.run(update_hud())
 ```
 
-### 2. Live Audio Streaming (LC3 Mic Packets)
-Leverage the asynchronous queues to pull raw microphone packets directly out of the dual-microphone architecture.
+### 2. Streaming Raw Microphone Data
+Subscribes to notifications on characteristic `0x6402` across both lenses to capture streaming microphone data.
 
 ```python
 import asyncio
-from g2_sdk import open_session
+from g2_protocol import open_session
 
-async def stream_mic_feeds():
+async def run_mic_stream():
     async with open_session(launch_app=True, skip_page=True) as session:
-        # Spin up micro-characteristic observers across both glasses stems
-        print("Initializing microphone stream listener hooks...")
         await session.start_audio_stream()
+        print("Microphone stream active. Press Ctrl+C to stop.")
         
         try:
-            print("Listening for inbound voice payloads. Press Ctrl+C to terminate...")
             while True:
-                # Extracts (arm identifier 'R'/'L', and 205-byte payload data buffer)
-                arm_side, raw_packet = await session.audio_packets.get()
+                # Extracts (lens_side 'R'/'L', and the 205-byte frame buffer)
+                side, packet = await session.audio_packets.get()
                 
-                # Payload format: 200 bytes LC3 audio data + signal markers
-                print(f"[{arm_side} Lens] Extracted {len(raw_packet)} byte LC3 buffer chunk")
-                
+                # Packet contains 200 bytes LC3 audio data + 5 trailer status bytes
+                print(f"[{side}] Received {len(packet)} byte audio chunk.")
         except asyncio.CancelledError:
-            print("Stopping audio pipeline capture...")
+            pass
         finally:
             await session.stop_audio_stream()
 
 if __name__ == "__main__":
-    asyncio.run(stream_mic_feeds())
+    asyncio.run(run_mic_stream())
 ```
 
-### 3. Passive Frame Sniffing & Logging
-Register a custom callback onto the low-level Bluetooth notification worker to inspect incoming traffic across any service channel in real time without stealing frame execution tokens from your primary commands.
+### 3. Passive Frame Interception & Packet Sniffing
+Uses the `on_raw_frame` callback hook to monitor incoming data streams in real time without blocking core message execution tasks.
 
 ```python
 import asyncio
-from g2_sdk import open_session, sids
+from g2_protocol import open_session, sids
 
-def handle_incoming_frame(svc_hi, svc_lo, protobuf_bytes):
-    # Resolve the raw byte into a human-readable service name using our sids registry
-    service_name = sids.get_name(svc_hi)
-    print(f"[{service_name}] Flag: 0x{svc_lo:02x} | Payload Size: {len(protobuf_bytes)} bytes")
+def log_frame(svc_hi, svc_lo, payload):
+    # Resolves the raw service byte to its name using the sids mapping module
+    name = sids.get_name(svc_hi)
+    print(f"[{name}] Flag: 0x{svc_lo:02x} | Payload: {len(payload)} bytes")
 
-async def capture_telemetry_events():
+async def monitor_bus():
     async with open_session(launch_app=True, skip_page=True) as session:
-        # Bind custom handler directly onto the Bluetooth notification thread
-        session.on_raw_frame = handle_incoming_frame
+        session.on_raw_frame = log_frame
         
-        print("Activating Inertial Measurement Unit (IMU) telemetry matrix...")
+        # Turn on the IMU stream at a 500ms interval
         await session.enable_imu(enable=True, report_freq=500)
-        
-        # Maintain live session to process real-time events
         await asyncio.sleep(30.0)
 
 if __name__ == "__main__":
-    asyncio.run(capture_telemetry_events())
+    asyncio.run(monitor_bus())
 ```
 
 ---
 
-## 🤝 Contributing
+## Technical Disclaimer
 
-Found undocumented `SID` codes, alternative frame flags, or new protobuf payload structures? Open an issue or drop a Pull Request detailing your hardware sniffing outputs! 
-
-## 📜 License & Disclaimer
-
-This project is licensed under the MIT License. It is a completely independent, community-driven reverse engineering project meant for educational and prototyping purposes. It is entirely unaffiliated with Even Realities.
+This is a community reverse-engineering project developed for interoperability testing and educational research. This software is completely independent and has no official affiliation with Even Realities. Distributed under the MIT License.
