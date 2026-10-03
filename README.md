@@ -2,6 +2,30 @@
 
 A third-party Python library and protocol mapping for Even Realities G2 smart glasses. This package provides direct access to the dual-lens BLE characteristics, native dashboard layout controls, raw LC3 microphone streams, and IMU telemetry.
 
+## Installation
+
+Install the library directly from GitHub using `pip`:
+
+```bash
+# Install the latest version from the main branch
+pip install git+https://github.com/ithinkthisiscool/even-g2-protocol
+
+# Or clone and install in editable mode for local development
+git clone https://github.com/ithinkthisiscool/even-g2-protocol
+cd even-g2-protocol
+pip install -e .
+```
+
+### System & Python Dependencies
+
+The following packages are installed automatically alongside the library:
+
+* **`bleak`**: Cross-platform Bluetooth Low Energy client used to manage links to both lenses.
+* **`dbus-fast`**: Enables the high-performance BlueZ connection fast-path on Linux.
+* **`aiohttp`**: Manages asynchronous server polling and external payload fetch routines.
+* **`lc3py`**: Raw audio compression codec processing the 205-byte microphone data bursts.
+* **`anthropic`**: Backend client bindings routing custom voice queries to Claude models.
+
 ## Features
 
 * **Session Management**: Automated connection handling for both lenses via BlueZ mac address fast-path or background scanning, including the required 4-second `SID 0xE0` heartbeat loop.
