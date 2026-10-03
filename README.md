@@ -137,6 +137,9 @@ if __name__ == "__main__":
 
 ---
 
+## Structure Change
+I know i will change the structure to be the standard, just wanted to get this out there for people to build cool things.
+
 ## Technical Disclaimer
 
 This is a community reverse-engineering project developed for interoperability testing and educational research. This software is completely independent and has no official affiliation with Even Realities. Distributed under the MIT License.
