@@ -1,22 +1,14 @@
-# even-g2-protocol
+# g2 — Even Realities G2 Python Library
 
-A third-party Python library and protocol mapping for Even Realities G2 smart glasses. This package provides direct access to the dual-lens BLE characteristics, native dashboard layout controls, raw LC3 microphone streams, and IMU telemetry.
+An open-source Python library for **Even Realities G2 smart glasses** over BLE. Reverse-engineered from protocol traces for custom dashboard execution, raw LC3 audio streaming, and IMU tracking.
 
-## Installation
+---
 
-Install the library directly from GitHub using `pip`:
+## Installation & Dependencies
 
 ```bash
-# Install the latest version from the main branch
 pip install git+https://github.com/ithinkthisiscool/even-g2-protocol
-
-# Or clone and install in editable mode for local development
-git clone https://github.com/ithinkthisiscool/even-g2-protocol
-cd even-g2-protocol
-pip install -e .
 ```
-
-### System & Python Dependencies
 
 The following packages are installed automatically alongside the library:
 
@@ -26,18 +18,32 @@ The following packages are installed automatically alongside the library:
 * **`lc3py`**: Raw audio compression codec processing the 205-byte microphone data bursts.
 * **`anthropic`**: Backend client bindings routing custom voice queries to Claude models.
 
-## Features
+---
 
-* **Session Management**: Automated connection handling for both lenses via BlueZ mac address fast-path or background scanning, including the required 4-second `SID 0xE0` heartbeat loop.
-* **Dashboard Modification**: Updates text fields and switches page configurations inside the native on-glasses UI.
-* **Audio Capture**: Asynchronous queues for extracting raw 205-byte LC3 microphone frames from the left and right stems.
-* **Subsystem Routing**: Built-in mapping that decodes and routes inbound data packets based on their one-byte Service ID (SID).
+## Code Architecture
+
+The package exposes clean, top-level unified modules out of `/g2/` while keeping individual layers separated.
+
+```
+.
+─────── g2/
+      ├── __init__.py   # Global namespace exports
+      ├── sids.py       # Service ID registries
+      ├── transport/    # Connection loops, auth, and BLE hooks
+      ├── apps/         # App modules (translation, teleprompter, assistant)
+      ├── widgets/      # Framing components and layout canvas engines
+      ├── device/       # System telemetry and configurations
+      ├── tests/        # Offline golden-byte validation suites
+```
+
+To execute the offline test suite without connecting physical hardware:
+```bash
+python -m pytest tests
+```
 
 ---
 
 ## Service ID (SID) Map
-
-Every BLE frame to or from the glasses contains a one-byte Service ID (SID) at byte index 6 of the header. This byte routes the data packet to a specific subsystem on the glasses.
 
 ### Core Applications
 * `0x01` (Dashboard): Direct modifications to the native HUD home dashboard.
@@ -57,89 +63,26 @@ Every BLE frame to or from the glasses contains a one-byte Service ID (SID) at b
 
 ---
 
-## Code Examples
+## Usage Examples
 
-### 1. Connection & HUD Text Injection
-Connects to the hardware using `G2_RIGHT_MAC` and `G2_LEFT_MAC` environment variables (or auto-discovery), runs the authentication handshake, and updates a native dashboard text container.
-
+### 1. Update HUD Dashboard Text
 ```python
 import asyncio
-from g2_protocol import open_session
+from g2 import GlassesSession
 
-async def update_hud():
-    # skip_page=True leaves the native dashboard visible without drawing an app over it
-    async with open_session(launch_app=True, skip_page=True) as session:
-        print(f"Connected: {session.is_connected}")
-        
-        # Query battery status and firmware metadata
-        settings = await session.query_settings()
-        print(f"Device Info: {settings}")
-
-        # Push updated text to the main dashboard container
+async def main():
+    async with GlassesSession(launch_app=True, skip_page=True) as session:
         await session.update_text("System Ready.")
         await asyncio.sleep(5)
 
 if __name__ == "__main__":
-    asyncio.run(update_hud())
+    asyncio.run(main())
 ```
 
-### 2. Streaming Raw Microphone Data
-Subscribes to notifications on characteristic `0x6402` across both lenses to capture streaming microphone data.
-
-```python
-import asyncio
-from g2_protocol import open_session
-
-async def run_mic_stream():
-    async with open_session(launch_app=True, skip_page=True) as session:
-        await session.start_audio_stream()
-        print("Microphone stream active. Press Ctrl+C to stop.")
-        
-        try:
-            while True:
-                # Extracts (lens_side 'R'/'L', and the 205-byte frame buffer)
-                side, packet = await session.audio_packets.get()
-                
-                # Packet contains 200 bytes LC3 audio data + 5 trailer status bytes
-                print(f"[{side}] Received {len(packet)} byte audio chunk.")
-        except asyncio.CancelledError:
-            pass
-        finally:
-            await session.stop_audio_stream()
-
-if __name__ == "__main__":
-    asyncio.run(run_mic_stream())
-```
-
-### 3. Passive Frame Interception & Packet Sniffing
-Uses the `on_raw_frame` callback hook to monitor incoming data streams in real time without blocking core message execution tasks.
-
-```python
-import asyncio
-from g2_protocol import open_session, sids
-
-def log_frame(svc_hi, svc_lo, payload):
-    # Resolves the raw service byte to its name using the sids mapping module
-    name = sids.get_name(svc_hi)
-    print(f"[{name}] Flag: 0x{svc_lo:02x} | Payload: {len(payload)} bytes")
-
-async def monitor_bus():
-    async with open_session(launch_app=True, skip_page=True) as session:
-        session.on_raw_frame = log_frame
-        
-        # Turn on the IMU stream at a 500ms interval
-        await session.enable_imu(enable=True, report_freq=500)
-        await asyncio.sleep(30.0)
-
-if __name__ == "__main__":
-    asyncio.run(monitor_bus())
-```
+### 2. Stream Raw Audio & Packet Sniffing
+For audio streaming and IMU packet monitoring via callbacks, initialize `GlassesSession` and call `start_audio_stream()` or configure `on_raw_frame` handlers as documented in the source repository.
 
 ---
 
-## Structure Change
-I know i will change the structure to be the standard, just wanted to get this out there for people to build cool things.
-
-## Technical Disclaimer
-
-This is a community reverse-engineering project developed for interoperability testing and educational research. This software is completely independent and has no official affiliation with Even Realities. Distributed under the MIT License.
+## Disclaimer
+Independent reverse-engineered research toolkit. Not affiliated with Even Realities. MIT License.
