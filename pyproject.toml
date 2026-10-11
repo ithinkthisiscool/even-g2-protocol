@@ -1,48 +1,25 @@
 [build-system]
-requires = ["setuptools>=61.0.0"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "even-g2-protocol"
-version = "0.1.0"
-description = "Python library and protocol reference for Even Realities G2 smart glasses dashboard control and data streaming."
+name = "eveng2-g2"
+version = "1.0.0"
+description = "From-scratch Python library for Even Realities G2 smart glasses over Bluetooth LE"
 readme = "README.md"
-requires-python = ">=3.10"
-authors = [
-    { name = "ithinkthisiscool" }
-]
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: POSIX :: Linux",
-]
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "eveng2" }]
+keywords = ["even-realities", "g2", "smart-glasses", "bluetooth", "ble"]
 dependencies = [
-    "bleak>=0.21.0",
-    "dbus-fast>=2.0.0",
-    "aiohttp>=3.9.0",
-    "lc3py>=1.1.0",
-    "anthropic>=0.19.0",
+    "bleak>=0.21",
 ]
 
-[tool.setuptools]
-# Tells setuptools to look for individual files in the root instead of a subfolder directory
-py-modules = [
-    "ble",
-    "dashboard",
-    "device",
-    "even_ai",
-    "evenhub",
-    "file_service",
-    "health",
-    "menu",
-    "navigation",
-    "quicklist",
-    "session",
-    "settings",
-    "sids",
-    "stocks",
-    "teleprompter",
-    "translate",
-    "transport",
-    "watchface"
-]
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
