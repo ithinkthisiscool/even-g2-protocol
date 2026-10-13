@@ -12,8 +12,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from g2 import ble, session as sess  # noqa: E402
 
-R_MAC, L_MAC = 'CC:00:00:12:34:56', 'C4:00:00:AB:CD:EF'
-R_NAME, L_NAME = 'Even G2_32_R_123456', 'Even G2_32_L_ABCDEF'
+R_MAC, L_MAC = 'GRAB MAC ADDRESS', 'GRAB MAC ADDRESS'
+R_NAME, L_NAME = 'GRAB NAME', 'GRAB NAME'
 # Real manufacturer data of the right lens (bluetoothctl info, 2026-09-29).
 R_MFR = bytes.fromhex('5332313147414245303030303031' '5634120000cc' '02')
 
